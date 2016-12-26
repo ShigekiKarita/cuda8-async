@@ -1,0 +1,41 @@
+#include <array>
+#include <future>
+#include "cuda_check.hpp"
+
+
+const int N = 1 << 20;
+
+__global__ void kernel(float *x, int n) {
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    for (int i = tid; i < n; i += blockDim.x * gridDim.x) {
+        x[i] = sqrt(pow(3.14159,i));
+    }
+}
+
+int main() {
+    const int num_streams = 8;
+    std::future<cudaError_t> fs[num_streams];
+    float* data[num_streams];
+
+    for (int i = 0; i < num_streams; i++) {
+        fs[i] = std::async(
+            std::launch::async, [=]() mutable
+            {
+                CUDA_CHECK(cudaMalloc(&data[i], N * sizeof(float)));
+
+                // launch one worker kernel per stream
+                kernel<<<1, 64, 0>>>(data[i], N);
+                CUDA_CHECK(cudaPeekAtLastError());
+                return cudaSuccess;
+            });
+        // launch a dummy kernel on the default stream
+        kernel<<<1, 1>>>(0, 0);
+        CUDA_CHECK(cudaPeekAtLastError());
+    }
+
+    for (auto&f: fs) {
+        CUDA_CHECK(f.get());
+    }
+
+    cudaDeviceReset();
+}
