@@ -14,10 +14,10 @@ __global__ void kernel(float *x, int n) {
 
 std::string launch_kernel() {
     float *data;
-    cudaMalloc(&data, N * sizeof(float));
+    CUDA_CHECK(cudaMalloc(&data, N * sizeof(float)));
     kernel<<<1, 64>>>(data, N);
     CUDA_CHECK(cudaPeekAtLastError());
-    cudaStreamSynchronize(0);
+    CUDA_CHECK(cudaStreamSynchronize(0));
     return "ok";
 }
 
